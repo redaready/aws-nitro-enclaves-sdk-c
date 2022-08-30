@@ -86,10 +86,7 @@ static void s_usage_decrypt(int exit_code) {
     fprintf(stderr, "    --aws-session-token SESSION_TOKEN: Session token associated with the access key ID\n");
     fprintf(stderr, "    --ciphertext CIPHERTEXT: base64-encoded ciphertext that need to decrypt\n");
     fprintf(stderr, "    --key-id KEY_ID: decrypt key id (for symmetric keys, is optional)\n");
-    fprintf(
-        stderr,
-        "    --encryption-algorithm ENCRYPTION_ALGORITHM: encryption algorhthm for ciphertext (is required if key-id "
-        "exists)\n");
+    fprintf(stderr, "    --encryption-algorithm ENCRYPTION_ALGORITHM: encryption algorithm for ciphertext\n");
     exit(exit_code);
 }
 
@@ -239,13 +236,6 @@ static void s_parse_options(int argc, char **argv, const char *subcommand, struc
         if (ctx->ciphertext_b64 == NULL) {
             fprintf(stderr, "--ciphertext must be set\n");
             exit(1);
-        }
-        // if key id is set check encryption algorithm is exists
-        if (ctx->key_id != NULL) {
-            if (ctx->encryption_algorithm == NULL) {
-                fprintf(stderr, "--encryption-algorithm must be set if key-id exists\n");
-                exit(1);
-            }
         }
 
     } else if (strncmp(subcommand, GENKEY_CMD, MAX_SUB_COMMAND_LENGTH) == 0) {
