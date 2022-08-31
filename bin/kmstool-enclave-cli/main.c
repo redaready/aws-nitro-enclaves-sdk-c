@@ -227,7 +227,7 @@ static void s_parse_options(int argc, char **argv, const char *subcommand, struc
     }
 
     /* Set default AWS region if not specified */
-    if (ctx->region == N8ECRYPT_CMD, MAX_SUB_COMMAND_LENGTH) == 0) {
+    if (strncmp(subcommand, DECRYPT_CMD, MAX_SUB_COMMAND_LENGTH) == 0) {
         /* Check if ciphertext is set */
         if (ctx->ciphertext_b64 == NULL) {
             fprintf(stderr, "--ciphertext must be set\n");
