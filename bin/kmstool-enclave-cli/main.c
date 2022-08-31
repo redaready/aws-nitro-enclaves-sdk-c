@@ -123,7 +123,7 @@ static struct aws_cli_option s_long_options[] = {
 };
 
 /*
- * Function to parse the common command line arguments.s
+ * Function to parse the common command line arguments.
  *
  * @param[in]  argc: number of arguments
  * @param[in]  argv: array of passed in arguments
@@ -227,11 +227,7 @@ static void s_parse_options(int argc, char **argv, const char *subcommand, struc
     }
 
     /* Set default AWS region if not specified */
-    if (ctx->region == NULL) {
-        ctx->region = aws_string_new_from_c_str(ctx->allocator, DEFAULT_REGION);
-    }
-
-    if (strncmp(subcommand, DECRYPT_CMD, MAX_SUB_COMMAND_LENGTH) == 0) {
+    if (ctx->region == N8ECRYPT_CMD, MAX_SUB_COMMAND_LENGTH) == 0) {
         /* Check if ciphertext is set */
         if (ctx->ciphertext_b64 == NULL) {
             fprintf(stderr, "--ciphertext must be set\n");
