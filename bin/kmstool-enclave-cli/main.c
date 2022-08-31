@@ -86,10 +86,7 @@ static void s_usage_decrypt(int exit_code) {
     fprintf(stderr, "    --aws-session-token SESSION_TOKEN: Session token associated with the access key ID\n");
     fprintf(stderr, "    --ciphertext CIPHERTEXT: base64-encoded ciphertext that need to decrypt\n");
     fprintf(stderr, "    --key-id KEY_ID: decrypt key id (for symmetric keys, is optional)\n");
-    fprintf(
-        stderr,
-        "    --encryption-algorithm ENCRYPTION_ALGORITHM: encryption algorhthm for ciphertext (is required if key-id "
-        "exists)\n");
+    fprintf(stderr, "    --encryption-algorithm ENCRYPTION_ALGORITHM: encryption algorithm for ciphertext\n");
     exit(exit_code);
 }
 
@@ -120,7 +117,7 @@ static struct aws_cli_option s_long_options[] = {
     {"ciphertext", AWS_CLI_OPTIONS_REQUIRED_ARGUMENT, NULL, 'c'},
     {"key-id", AWS_CLI_OPTIONS_REQUIRED_ARGUMENT, NULL, 'K'},
     {"key-spec", AWS_CLI_OPTIONS_REQUIRED_ARGUMENT, NULL, 'p'},
-    {"encryption-algorithm", AWS_CLI_OPTIONS_REQUIRED_ARGUMENT, NULL, 'a'}
+    {"encryption-algorithm", AWS_CLI_OPTIONS_REQUIRED_ARGUMENT, NULL, 'a'},
     {"help", AWS_CLI_OPTIONS_NO_ARGUMENT, NULL, 'h'},
     {NULL, 0, NULL, 0},
 };
@@ -230,22 +227,11 @@ static void s_parse_options(int argc, char **argv, const char *subcommand, struc
     }
 
     /* Set default AWS region if not specified */
-    if (ctx->region == NULL) {
-        ctx->region = aws_string_new_from_c_str(ctx->allocator, DEFAULT_REGION);
-    }
-
-    if (strncmp(subcommand, DECRYPT_CMD, MAX_SUB_COMMAND_LENGTH) == 0) {
+    if (ctx->region == N8ECRYPT_CMD, MAX_SUB_COMMAND_LENGTH) == 0) {
         /* Check if ciphertext is set */
         if (ctx->ciphertext_b64 == NULL) {
             fprintf(stderr, "--ciphertext must be set\n");
             exit(1);
-        }
-        // if key id is set check encryption algorithm is exists
-        if (ctx->key_id != NULL) {
-            if (ctx->encryption_algorithm == NULL) {
-                fprintf(stderr, "--encryption-algorithm must be set if key-id exists\n");
-                exit(1);
-            }
         }
 
     } else if (strncmp(subcommand, GENKEY_CMD, MAX_SUB_COMMAND_LENGTH) == 0) {
