@@ -19,6 +19,8 @@
 
 #define DECRYPT_CMD "decrypt"
 #define GENKEY_CMD  "genkey"
+#define SIGN_CMD  "sign"
+
 
 #define AES_256_ARG "AES-256"
 #define AES_128_ARG "AES-128"
@@ -59,6 +61,10 @@ struct app_ctx {
     const struct aws_string *encryption_algorithm;
     const struct aws_string *key_id;
     enum aws_key_spec key_spec;
+
+    // sign
+    struct aws_byte_buf message;
+    enum aws_signing_algorithm signing_algorithm;
 };
 
 /*
@@ -84,6 +90,12 @@ static void s_usage_decrypt(int exit_code) {
     fprintf(stderr, "    --aws-access-key-id ACCESS_KEY_ID: AWS access key ID\n");
     fprintf(stderr, "    --aws-secret-access-key SECRET_ACCESS_KEY: AWS secret access key\n");
     fprintf(stderr, "    --aws-session-token SESSION_TOKEN: Session token associated with the access key ID\n");
+    fprintf(stderr, "  sign args:\n");
+    fprintf(stderr, "    --key-id KEY_ID: sign key id\n");
+    fprintf(stderr, "    --message MESSAGE: message digest to sign\n");
+    // fprintf(stderr, "    --signing-algorithm SIGNING_ALGORITHM: signing algorithm\n");
+    fprintf(stderr, "  decrypt args\n");
+    fprintf(stderr, "    --key-id KEY_ID: decrypt or key id (for symmetric keys, is optional)\n");
     fprintf(stderr, "    --ciphertext CIPHERTEXT: base64-encoded ciphertext that need to decrypt\n");
     fprintf(stderr, "    --key-id KEY_ID: decrypt key id (for symmetric keys, is optional)\n");
     fprintf(stderr, "    --encryption-algorithm ENCRYPTION_ALGORITHM: encryption algorithm for ciphertext\n");
@@ -106,6 +118,24 @@ static void s_usage_genkey(int exit_code) {
     fprintf(stderr, "    --key-spec KEY_SPEC: The key spec used to create the key (AES-256 or AES-128).\n");
     exit(exit_code);
 }
+/*
+ * Function to print out the arguments for genkey
+ */
+static void s_usage_sign(int exit_code) {
+    fprintf(stderr, "usage: kmstool_enclave_cli sign [options]\n");
+    fprintf(stderr, "\n Options: \n\n");
+    fprintf(stderr, "    --help: Displays this message and exits\n");
+    fprintf(stderr, "    --region REGION: AWS region to use for KMS. Default: 'us-east-1'\n");
+    fprintf(stderr, "    --proxy-port PORT: Connect to KMS proxy on PORT. Default: 8000\n");
+    fprintf(stderr, "    --aws-access-key-id ACCESS_KEY_ID: AWS access key ID\n");
+    fprintf(stderr, "    --aws-secret-access-key SECRET_ACCESS_KEY: AWS secret access key\n");
+    fprintf(stderr, "    --aws-session-token SESSION_TOKEN: Session token associated with the access key ID\n");
+    fprintf(stderr, "    --key-id KEY_ID: key id\n");
+    fprintf(stderr, "    --message message: Them message digest to sign\n");
+    exit(exit_code);
+}
+
+
 
 /* Command line options */
 static struct aws_cli_option s_long_options[] = {
@@ -114,7 +144,7 @@ static struct aws_cli_option s_long_options[] = {
     {"aws-access-key-id", AWS_CLI_OPTIONS_REQUIRED_ARGUMENT, NULL, 'k'},
     {"aws-secret-access-key", AWS_CLI_OPTIONS_REQUIRED_ARGUMENT, NULL, 's'},
     {"aws-session-token", AWS_CLI_OPTIONS_REQUIRED_ARGUMENT, NULL, 't'},
-    {"ciphertext", AWS_CLI_OPTIONS_REQUIRED_ARGUMENT, NULL, 'c'},
+    {"message", AWS_CLI_OPTIONS_REQUIRED_ARGUMENT, NULL, 'm'},
     {"key-id", AWS_CLI_OPTIONS_REQUIRED_ARGUMENT, NULL, 'K'},
     {"key-spec", AWS_CLI_OPTIONS_REQUIRED_ARGUMENT, NULL, 'p'},
     {"encryption-algorithm", AWS_CLI_OPTIONS_REQUIRED_ARGUMENT, NULL, 'a'},
@@ -136,16 +166,16 @@ static void s_parse_options(int argc, char **argv, const char *subcommand, struc
     ctx->aws_access_key_id = NULL;
     ctx->aws_secret_access_key = NULL;
     ctx->aws_session_token = NULL;
-    ctx->ciphertext_b64 = NULL;
     ctx->key_id = NULL;
     ctx->key_spec = -1;
     ctx->encryption_algorithm = NULL;
+    ctx->signing_algorithm = AWS_SA_ECDSA_SHA_256;
 
     aws_cli_optind = 2;
     while (true) {
         int option_index = 0;
 
-        int c = aws_cli_getopt_long(argc, argv, "r:x:k:s:t:c:K:p:a:h", s_long_options, &option_index);
+        int c = aws_cli_getopt_long(argc, argv, "r:x:k:s:t:c:K:p:m:a:h", s_long_options, &option_index);
         if (c == -1) {
             break;
         }
@@ -173,6 +203,8 @@ static void s_parse_options(int argc, char **argv, const char *subcommand, struc
                     s_usage_decrypt(1);
                 else if (strncmp(subcommand, GENKEY_CMD, MAX_SUB_COMMAND_LENGTH) == 0)
                     s_usage_genkey(1);
+                else if (strncmp(subcommand, SIGN_CMD, MAX_SUB_COMMAND_LENGTH) == 0)
+                    s_usage_sign(1);
                 break;
             default:
                 if (strncmp(subcommand, DECRYPT_CMD, MAX_SUB_COMMAND_LENGTH) == 0) { 
@@ -202,6 +234,15 @@ static void s_parse_options(int argc, char **argv, const char *subcommand, struc
                                 fprintf(stderr, "Unknown key spec: %s\n", aws_cli_optarg);
                                 s_usage_genkey(1);
                             }
+                            break;
+                    }
+                }else if (strncmp(subcommand, SIGN_CMD, MAX_SUB_COMMAND_LENGTH) == 0) {
+                    switch(c) {
+                        case 'K':
+                            ctx->key_id = aws_string_new_from_c_str(ctx->allocator, aws_cli_optarg);
+                            break;
+                        case 'm':
+                            ctx->message = aws_byte_buf_from_c_str(aws_cli_optarg);
                             break;
                     }
                 }
@@ -244,6 +285,18 @@ static void s_parse_options(int argc, char **argv, const char *subcommand, struc
         /* Check if key spec is set */
         if (ctx->key_spec == -1) {
             fprintf(stderr, "--key-spec must be set\n");
+            exit(1);
+        }
+    }  if (strncmp(subcommand, SIGN_CMD, MAX_SUB_COMMAND_LENGTH) == 0) {
+        /* Check if the key id is set */
+        if (ctx->key_id == NULL) {
+            fprintf(stderr, "--key-id must be set\n");
+            exit(1);
+        }
+
+        /* Check if message is set */
+        if (aws_byte_buf_is_valid(&ctx->message)) {
+            fprintf(stderr, "--message must be set\n");
             exit(1);
         }
     }
@@ -384,6 +437,31 @@ static int gen_datakey(struct app_ctx *app_ctx, struct aws_byte_buf *ciphertext_
     return AWS_OP_SUCCESS;
 }
 
+/*
+ * Function to sign.
+ *
+ */
+static int sign(struct app_ctx *app_ctx, struct aws_byte_buf *signature_b64) {
+    ssize_t rc = 0;
+
+    struct aws_credentials *credentials = NULL;
+    struct aws_nitro_enclaves_kms_client *client = NULL;
+
+    init_kms_client(app_ctx, &credentials, &client);
+    struct aws_byte_buf signature;
+    rc = aws_kms_sign_blocking(
+        client, app_ctx->key_id, app_ctx->signing_algorithm, &app_ctx->message, AWS_MT_DIGEST, &signature);
+    fail_on(rc != AWS_OP_SUCCESS, "Could not generate data key");
+
+    /* Encode ciphertext into base64 for printing out the result. */
+    rc = encode_b64(app_ctx, &signature, signature_b64);
+    fail_on(rc != AWS_OP_SUCCESS, "Could not encode ciphertext");
+    /* Cleaning up allocated memory. */
+    aws_nitro_enclaves_kms_client_destroy(client);
+    aws_credentials_release(credentials);
+
+    return AWS_OP_SUCCESS;
+}
 int main(int argc, char **argv) {
     struct app_ctx app_ctx;
     int rc;
@@ -444,7 +522,19 @@ int main(int argc, char **argv) {
     
         aws_byte_buf_clean_up(&ciphertext_b64);
         aws_byte_buf_clean_up(&plaintext_b64);
-    } else {
+    } else if (strncmp(subcommand, SIGN_CMD, MAX_SUB_COMMAND_LENGTH) == 0) {
+        struct aws_byte_buf signature_b64;
+        
+        rc = sign(&app_ctx, &signature_b64);
+    
+        /* Error if data key wasn't generated */
+        fail_on(rc != AWS_OP_SUCCESS, "Could not sign\n");
+
+        /* Print the message */
+        fprintf(stdout, "message to sign: %s\n", (const char *)app_ctx.message.buffer);
+        
+        aws_byte_buf_clean_up(&signature_b64);
+    }else {
         print_commands(1);
     }
     
