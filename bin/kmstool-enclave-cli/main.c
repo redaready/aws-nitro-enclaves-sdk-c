@@ -13,14 +13,13 @@
 #include <errno.h>
 #include <unistd.h>
 
-#define DEFAULT_PROXY_PORT  8000
-#define DEFAULT_REGION      "us-east-1"
-#define DEFAULT_PARENT_CID  "3"
+#define DEFAULT_PROXY_PORT 8000
+#define DEFAULT_REGION "us-east-1"
+#define DEFAULT_PARENT_CID "3"
 
 #define DECRYPT_CMD "decrypt"
-#define GENKEY_CMD  "genkey"
-#define SIGN_CMD  "sign"
-
+#define GENKEY_CMD "genkey"
+#define SIGN_CMD "sign"
 
 #define AES_256_ARG "AES-256"
 #define AES_128_ARG "AES-128"
@@ -97,7 +96,6 @@ static void s_usage_decrypt(int exit_code) {
     fprintf(stderr, "  decrypt args\n");
     fprintf(stderr, "    --key-id KEY_ID: decrypt or key id (for symmetric keys, is optional)\n");
     fprintf(stderr, "    --ciphertext CIPHERTEXT: base64-encoded ciphertext that need to decrypt\n");
-    fprintf(stderr, "    --key-id KEY_ID: decrypt key id (for symmetric keys, is optional)\n");
     fprintf(stderr, "    --encryption-algorithm ENCRYPTION_ALGORITHM: encryption algorithm for ciphertext\n");
     exit(exit_code);
 }
@@ -131,11 +129,9 @@ static void s_usage_sign(int exit_code) {
     fprintf(stderr, "    --aws-secret-access-key SECRET_ACCESS_KEY: AWS secret access key\n");
     fprintf(stderr, "    --aws-session-token SESSION_TOKEN: Session token associated with the access key ID\n");
     fprintf(stderr, "    --key-id KEY_ID: key id\n");
-    fprintf(stderr, "    --message message: Them message digest to sign\n");
+    fprintf(stderr, "    --message message: The message digest to be signed\n");
     exit(exit_code);
 }
-
-
 
 /* Command line options */
 static struct aws_cli_option s_long_options[] = {
@@ -144,6 +140,7 @@ static struct aws_cli_option s_long_options[] = {
     {"aws-access-key-id", AWS_CLI_OPTIONS_REQUIRED_ARGUMENT, NULL, 'k'},
     {"aws-secret-access-key", AWS_CLI_OPTIONS_REQUIRED_ARGUMENT, NULL, 's'},
     {"aws-session-token", AWS_CLI_OPTIONS_REQUIRED_ARGUMENT, NULL, 't'},
+    {"ciphertext", AWS_CLI_OPTIONS_REQUIRED_ARGUMENT, NULL, 'c'},
     {"message", AWS_CLI_OPTIONS_REQUIRED_ARGUMENT, NULL, 'm'},
     {"key-id", AWS_CLI_OPTIONS_REQUIRED_ARGUMENT, NULL, 'K'},
     {"key-spec", AWS_CLI_OPTIONS_REQUIRED_ARGUMENT, NULL, 'p'},
@@ -186,7 +183,7 @@ static void s_parse_options(int argc, char **argv, const char *subcommand, struc
             case 'r':
                 ctx->region = aws_string_new_from_c_str(ctx->allocator, aws_cli_optarg);
                 break;
-            case 'x':          
+            case 'x':
                 ctx->proxy_port = atoi(aws_cli_optarg);
                 break;
             case 'k':
@@ -196,6 +193,7 @@ static void s_parse_options(int argc, char **argv, const char *subcommand, struc
                 ctx->aws_secret_access_key = aws_string_new_from_c_str(ctx->allocator, aws_cli_optarg);
                 break;
             case 't':
+                fprintf(stderr, "t %s\n", aws_cli_optarg);
                 ctx->aws_session_token = aws_string_new_from_c_str(ctx->allocator, aws_cli_optarg);
                 break;
             case 'h':
@@ -207,12 +205,13 @@ static void s_parse_options(int argc, char **argv, const char *subcommand, struc
                     s_usage_sign(1);
                 break;
             default:
-                if (strncmp(subcommand, DECRYPT_CMD, MAX_SUB_COMMAND_LENGTH) == 0) { 
+                if (strncmp(subcommand, DECRYPT_CMD, MAX_SUB_COMMAND_LENGTH) == 0) {
                     switch (c) {
                         case 'c':
+                            fprintf(stderr, "t %s\n", aws_cli_optarg);
                             ctx->ciphertext_b64 = aws_string_new_from_c_str(ctx->allocator, aws_cli_optarg);
                             break;
-                         case 'a':
+                        case 'a':
                             ctx->encryption_algorithm = aws_string_new_from_c_str(ctx->allocator, aws_cli_optarg);
                             break;
 
@@ -221,7 +220,7 @@ static void s_parse_options(int argc, char **argv, const char *subcommand, struc
                             s_usage_decrypt(1);
                     }
                 } else if (strncmp(subcommand, GENKEY_CMD, MAX_SUB_COMMAND_LENGTH) == 0) {
-                    switch(c) {
+                    switch (c) {
                         case 'K':
                             ctx->key_id = aws_string_new_from_c_str(ctx->allocator, aws_cli_optarg);
                             break;
@@ -236,8 +235,8 @@ static void s_parse_options(int argc, char **argv, const char *subcommand, struc
                             }
                             break;
                     }
-                }else if (strncmp(subcommand, SIGN_CMD, MAX_SUB_COMMAND_LENGTH) == 0) {
-                    switch(c) {
+                } else if (strncmp(subcommand, SIGN_CMD, MAX_SUB_COMMAND_LENGTH) == 0) {
+                    switch (c) {
                         case 'K':
                             ctx->key_id = aws_string_new_from_c_str(ctx->allocator, aws_cli_optarg);
                             break;
@@ -283,11 +282,12 @@ static void s_parse_options(int argc, char **argv, const char *subcommand, struc
         }
 
         /* Check if key spec is set */
-        if (ctx->key_spec == -1) {
+        if (ctx->key_spec == AWS_KS_UNINITIALIZED) {
             fprintf(stderr, "--key-spec must be set\n");
             exit(1);
         }
-    }  if (strncmp(subcommand, SIGN_CMD, MAX_SUB_COMMAND_LENGTH) == 0) {
+    }
+    if (strncmp(subcommand, SIGN_CMD, MAX_SUB_COMMAND_LENGTH) == 0) {
         /* Check if the key id is set */
         if (ctx->key_id == NULL) {
             fprintf(stderr, "--key-id must be set\n");
@@ -295,7 +295,7 @@ static void s_parse_options(int argc, char **argv, const char *subcommand, struc
         }
 
         /* Check if message is set */
-        if (aws_byte_buf_is_valid(&ctx->message)) {
+        if (ctx->message.len==0) {
             fprintf(stderr, "--message must be set\n");
             exit(1);
         }
@@ -309,7 +309,10 @@ static void s_parse_options(int argc, char **argv, const char *subcommand, struc
  * @param[out] credentials: location to store the aws credentials
  * @param[out] client: location to store new kms client
  */
-static void init_kms_client(struct app_ctx *app_ctx, struct aws_credentials **credentials, struct aws_nitro_enclaves_kms_client **client) {
+static void init_kms_client(
+    struct app_ctx *app_ctx,
+    struct aws_credentials **credentials,
+    struct aws_nitro_enclaves_kms_client **client) {
     /* Parent is always on CID 3 */
     struct aws_socket_endpoint endpoint = {.address = DEFAULT_PARENT_CID, .port = app_ctx->proxy_port};
     struct aws_nitro_enclaves_kms_client_configuration configuration = {
@@ -340,7 +343,7 @@ static void init_kms_client(struct app_ctx *app_ctx, struct aws_credentials **cr
  * @param[in]  app_ctx: contains the allocator required for memory management
  * @param[in]  text: pointer to where the original text is stored
  * @param[out] text_b64: pointer to where the encoded string should be stored
- */ 
+ */
 static int encode_b64(struct app_ctx *app_ctx, struct aws_byte_buf *text, struct aws_byte_buf *text_b64) {
     ssize_t rc = 0;
     size_t text_b64_len;
@@ -369,8 +372,7 @@ static int decrypt(struct app_ctx *app_ctx, struct aws_byte_buf *ciphertext_decr
     struct aws_nitro_enclaves_kms_client *client = NULL;
 
     init_kms_client(app_ctx, &credentials, &client);
-   
-    
+
     /* Get decode base64 string into bytes. */
     size_t ciphertext_len;
     struct aws_byte_buf ciphertext;
@@ -386,7 +388,7 @@ static int decrypt(struct app_ctx *app_ctx, struct aws_byte_buf *ciphertext_decr
     struct aws_byte_buf ciphertext_decrypted;
     rc = aws_kms_decrypt_blocking(
         client, app_ctx->key_id, app_ctx->encryption_algorithm, &ciphertext, &ciphertext_decrypted);
-    
+
     aws_byte_buf_clean_up(&ciphertext);
     fail_on(rc != AWS_OP_SUCCESS, "Could not decrypt ciphertext");
 
@@ -397,7 +399,7 @@ static int decrypt(struct app_ctx *app_ctx, struct aws_byte_buf *ciphertext_decr
     /* Cleaning up allocated memory */
     aws_nitro_enclaves_kms_client_destroy(client);
     aws_credentials_release(credentials);
-    
+
     return AWS_OP_SUCCESS;
 }
 
@@ -408,7 +410,10 @@ static int decrypt(struct app_ctx *app_ctx, struct aws_byte_buf *ciphertext_decr
  * @param[out] ciphertext_decrypted_b64: Byte buffer where the ciphertext blob will be stored
  * @param[out] plaintext_b64: Byte buffer where the plaintext output will be stored
  */
-static int gen_datakey(struct app_ctx *app_ctx, struct aws_byte_buf *ciphertext_b64, struct aws_byte_buf *plaintext_b64) {
+static int gen_datakey(
+    struct app_ctx *app_ctx,
+    struct aws_byte_buf *ciphertext_b64,
+    struct aws_byte_buf *plaintext_b64) {
     ssize_t rc = 0;
 
     struct aws_credentials *credentials = NULL;
@@ -421,11 +426,11 @@ static int gen_datakey(struct app_ctx *app_ctx, struct aws_byte_buf *ciphertext_
     struct aws_byte_buf ciphertext;
     rc = aws_kms_generate_data_key_blocking(client, app_ctx->key_id, app_ctx->key_spec, &plaintext, &ciphertext);
     fail_on(rc != AWS_OP_SUCCESS, "Could not generate data key");
-    
+
     /* Encode ciphertext into base64 for printing out the result. */
     rc = encode_b64(app_ctx, &ciphertext, ciphertext_b64);
     fail_on(rc != AWS_OP_SUCCESS, "Could not encode ciphertext");
-    
+
     /* Encode plaintext into base64 for printing out the result. */
     rc = encode_b64(app_ctx, &plaintext, plaintext_b64);
     fail_on(rc != AWS_OP_SUCCESS, "Could not encode plaintext");
@@ -433,7 +438,7 @@ static int gen_datakey(struct app_ctx *app_ctx, struct aws_byte_buf *ciphertext_
     /* Cleaning up allocated memory. */
     aws_nitro_enclaves_kms_client_destroy(client);
     aws_credentials_release(credentials);
-    
+
     return AWS_OP_SUCCESS;
 }
 
@@ -467,78 +472,80 @@ int main(int argc, char **argv) {
     int rc;
     const char *subcommand;
 
-    /* Initialize the SDK */
+    // /* Initialize the SDK */
     aws_nitro_enclaves_library_init(NULL);
 
-    /* Initialize the entropy pool: this is relevant for TLS */
-    AWS_ASSERT(aws_nitro_enclaves_library_seed_entropy(1024) == AWS_OP_SUCCESS);
+    // /* Initialize the entropy pool: this is relevant for TLS */
+    // AWS_ASSERT(aws_nitro_enclaves_library_seed_entropy(1024) == AWS_OP_SUCCESS);
 
-    /* Parse the commandline */
+    // /* Parse the commandline */
     app_ctx.allocator = aws_nitro_enclaves_get_allocator();
-    
-    /* Verifies there are at least two arguments */    
+
+    /* Verifies there are at least two arguments */
     if (argc < 2) {
         print_commands(1);
     }
-    
-    subcommand = argv[1];
-    
-    /* Optional: Enable logging for aws-c-* libraries */
-    struct aws_logger err_logger;
-    struct aws_logger_standard_options options = {
-        .file = stderr,
-        .level = AWS_LL_INFO,
-        .filename = NULL,
-    };
-    aws_logger_init_standard(&err_logger, app_ctx.allocator, &options);
-    aws_logger_set(&err_logger);
 
+    subcommand = argv[1];
+    fprintf(stdout, "PLAINTEXT: %s\n", subcommand);
+
+    /* Optional: Enable logging for aws-c-* libraries */
+    // struct aws_logger err_logger;
+    // struct aws_logger_standard_options options = {
+    //     .file = stderr,
+    //     .level = AWS_LL_INFO,
+    //     .filename = NULL,
+    // };
+    // aws_logger_init_standard(&err_logger, app_ctx.allocator, &options);
+    // aws_logger_set(&err_logger);
+    
     s_parse_options(argc, argv, subcommand, &app_ctx);
+    fprintf(stdout, "subcommand", subcommand);
 
     if (strncmp(subcommand, DECRYPT_CMD, MAX_SUB_COMMAND_LENGTH) == 0) {
         struct aws_byte_buf ciphertext_decrypted_b64;
-    
+
         rc = decrypt(&app_ctx, &ciphertext_decrypted_b64);
-        
+
         /* Error out if ciphertext wasn't decrypted */
         fail_on(rc != AWS_OP_SUCCESS, "Could not decrypt\n");
 
         /* Print the base64-encoded plaintext to stdout */
         fprintf(stdout, "PLAINTEXT: %s\n", (const char *)ciphertext_decrypted_b64.buffer);
-    
+
         aws_byte_buf_clean_up(&ciphertext_decrypted_b64);
     } else if (strncmp(subcommand, GENKEY_CMD, MAX_SUB_COMMAND_LENGTH) == 0) {
         struct aws_byte_buf ciphertext_b64;
         struct aws_byte_buf plaintext_b64;
-        
+
         rc = gen_datakey(&app_ctx, &ciphertext_b64, &plaintext_b64);
-    
+
         /* Error if data key wasn't generated */
         fail_on(rc != AWS_OP_SUCCESS, "Could not generate data key\n");
 
         /* Print the base64-encoded ciphertext and plaintext to stdout */
         fprintf(stdout, "CIPHERTEXT: %s\n", (const char *)ciphertext_b64.buffer);
         fprintf(stdout, "PLAINTEXT: %s\n", (const char *)plaintext_b64.buffer);
-    
+
         aws_byte_buf_clean_up(&ciphertext_b64);
         aws_byte_buf_clean_up(&plaintext_b64);
     } else if (strncmp(subcommand, SIGN_CMD, MAX_SUB_COMMAND_LENGTH) == 0) {
         struct aws_byte_buf signature_b64;
-        
+
         rc = sign(&app_ctx, &signature_b64);
-    
+
         /* Error if data key wasn't generated */
         fail_on(rc != AWS_OP_SUCCESS, "Could not sign\n");
 
         /* Print the message */
         fprintf(stdout, "message to sign: %s\n", (const char *)app_ctx.message.buffer);
-        
+
         aws_byte_buf_clean_up(&signature_b64);
-    }else {
+    } else {
         print_commands(1);
     }
-    
-    aws_nitro_enclaves_library_clean_up();
-    
+
+    // aws_nitro_enclaves_library_clean_up();
+
     return 0;
 }
