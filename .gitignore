@@ -21,3 +21,6 @@ build
 _build_*
 cmake-build*
 
+bin/kmstool-enclave-cli/build.sh
+bin/kmstool-enclave-cli/libnsm.so
+bin/kmstool-enclave-cli/kmstool_enclave_cli

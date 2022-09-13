@@ -1,0 +1,7 @@
+{
+    "files.associations": {
+        "command_line_parser.h": "c",
+        "nitro_enclaves.h": "c",
+        "kms.h": "c"
+    }
+}

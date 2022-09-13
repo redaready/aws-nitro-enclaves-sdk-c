@@ -1,0 +1,27 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "cppdbg",
+            "name": "Debug kmstool_enclave_cli",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "args": ["decrypt","--region","r","--proxy-port","10","--aws-access-key-id", "a", "--aws-secret-access-key", "c", "--aws-session-token", "d", "--ciphertext","d"],
+            //"args": ["sign","--aws-access-key-id", "a", "--aws-secret-access-key", "c", "--aws-session-token", "d", "--message","d", "--key-id","d"],
+            //"args": ["datakey","--aws-access-key-id", "a", "--aws-secret-access-key", "c", "--aws-session-token", "d", "--message","d", "--key-id","d"],
+            "MIMode": "gdb",
+            "miDebuggerPath": "/usr/bin/gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "program": "${command:cmake.launchTargetPath}",
+            "environment": [
+                
+            ]
+        }
+    ]
+}
